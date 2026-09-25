@@ -1,0 +1,103 @@
+name: Sync upstream
+
+# Merges keiyoushi/extensions-source main into this overlay fork every 3 days and
+# then triggers CI so that whitelisted modules touched upstream get rebuilt.
+#
+# - Merge, never rebase (the fork is public).
+# - `.github/workflows/**` is always kept as-is from this fork: the overlay has
+#   its own customised workflows, and the default GITHUB_TOKEN is not allowed to
+#   push workflow changes anyway. Upstream changes to those files are reported in
+#   the job summary for manual review.
+# - Any other merge conflict fails the run (GitHub emails the owner) and leaves
+#   the branch untouched.
+
+on:
+  schedule:
+    - cron: '0 5 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge upstream/main
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      UPSTREAM_REPO: keiyoushi/extensions-source
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream
+        id: merge
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags upstream main
+
+          before="$(git rev-parse HEAD)"
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with upstream."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          new_commits="$(git rev-list --count HEAD..upstream/main)"
+          upstream_workflow_changes="$(git diff --name-only HEAD upstream/main -- .github/workflows || true)"
+
+          if ! git merge --no-edit upstream/main; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            echo "Conflicted files:"; echo "$conflicts"
+            # Tolerate conflicts confined to workflow files: we keep ours.
+            if [[ -n "$conflicts" ]] && ! grep -qv '^\.github/workflows/' <<<"$conflicts"; then
+              git checkout --ours -- .github/workflows
+              git add .github/workflows
+              git -c core.editor=true merge --continue
+            else
+              git merge --abort
+              echo "::error::Merge conflict outside .github/workflows; resolve manually (see OVERLAY.md)."
+              exit 1
+            fi
+          fi
+
+          # Always keep this fork's workflow files exactly as they were.
+          if ! git diff --quiet "$before" HEAD -- .github/workflows; then
+            git checkout "$before" -- .github/workflows
+            git commit -q --amend --no-edit
+          fi
+
+          git push origin HEAD:main
+
+          {
+            echo "### Upstream sync"
+            echo
+            echo "Merged **$new_commits** upstream commit(s) from \`$UPSTREAM_REPO\`."
+            if [[ -n "$upstream_workflow_changes" ]]; then
+              echo
+              echo "> Upstream changed workflow files that this fork keeps its own copy of. Review manually:"
+              echo
+              echo '```'
+              echo "$upstream_workflow_changes"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger CI build
+        if: steps.merge.outputs.changed == 'true'
+        run: gh workflow run build_push.yml --repo "$GITHUB_REPOSITORY" --ref main

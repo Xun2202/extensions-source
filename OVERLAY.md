@@ -38,7 +38,9 @@ Everything overlay-specific is confined to:
 
 ## Routine maintenance
 
-Sync with upstream (merge, do not rebase - the fork is public):
+Upstream is merged automatically every 3 days by [`.github/workflows/sync_upstream.yml`](.github/workflows/sync_upstream.yml)
+(merge, never rebase; this fork's `.github/workflows/**` are always kept as-is; any other conflict fails the
+run and GitHub emails the owner). CI is triggered after a successful merge. To sync by hand:
 
 ```bash
 git fetch upstream

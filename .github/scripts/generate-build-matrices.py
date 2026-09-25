@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from github_utils import load_overlay_modules, overlay_package_suffixes
+
 EXTENSION_REGEX = re.compile(r"^src/(?P<lang>\w+)/(?P<extension>\w+)")
 MULTISRC_LIB_REGEX = re.compile(r"^lib-multisrc/(?P<multisrc>\w+)")
 LIB_REGEX = re.compile(r"^lib/(?P<lib>\w+)")
@@ -248,9 +250,27 @@ def create_matrix(modules: list[str]) -> dict:
     }
 
 
+def apply_overlay(modules: list[str], deleted: list[str]) -> tuple[list[str], list[str]]:
+    """
+    Restricts the build/delete lists to the modules listed in the overlay file, if present.
+    """
+    overlay = load_overlay_modules()
+    if overlay is None:
+        return modules, deleted
+
+    overlay_modules = {f":src:{lang}:{extension}" for lang, extension in overlay}
+    overlay_suffixes = overlay_package_suffixes() or set()
+
+    return (
+        [module for module in modules if module in overlay_modules],
+        [suffix for suffix in deleted if suffix in overlay_suffixes],
+    )
+
+
 def main() -> None:
     _, ref = sys.argv
     modules, deleted, lint_modules = get_module_list(ref)
+    modules, deleted = apply_overlay(modules, deleted)
 
     matrix = create_matrix(modules)
 

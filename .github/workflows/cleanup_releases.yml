@@ -15,7 +15,10 @@ concurrency:
 jobs:
   cleanup:
     name: Remove unreferenced release assets
-    if: github.repository == 'keiyoushi/extensions-source'
+    if: github.repository == 'Xun2202/extensions-source'
+    env:
+      SOURCE_REPO: Xun2202/extensions-source
+      PUBLISH_REPO: Xun2202/extensions
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:

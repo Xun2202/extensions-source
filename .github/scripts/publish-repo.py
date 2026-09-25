@@ -3,12 +3,13 @@ import hashlib
 import html
 import json
 import math
+import os
 import sys
 import time
 from pathlib import Path
 
 import index_pb2
-from github_utils import REPO_NAME, run_gh
+from github_utils import REPO_NAME, SOURCE_REPO, overlay_package_suffixes, run_gh
 from google.protobuf import json_format
 
 # Artifacts downloaded from the build jobs: one APK per extension plus the source metadata JSON
@@ -18,8 +19,19 @@ ARTIFACTS_DIR = Path.home() / "apk-artifacts"
 # The checked-out `repo` branch we publish into (the working directory).
 REPO_DIR = Path.cwd()
 
-ICON_BASE_URL = "https://cdn.jsdelivr.net/gh/keiyoushi/extensions-source@main"
+ICON_BASE_URL = f"https://cdn.jsdelivr.net/gh/{SOURCE_REPO}@main"
 RELEASE_BASE_URL = f"https://github.com/{REPO_NAME}/releases/download"
+
+# Repo identity written into index.pb. Mihon compares `signingKey` (SHA-256 of the signing
+# certificate) against installed APKs to decide whether extensions from this repo are trusted.
+INDEX_NAME = os.getenv("INDEX_NAME", "Keiyoushi")
+INDEX_BADGE = os.getenv("INDEX_BADGE", "KEI")
+INDEX_SIGNING_KEY = os.getenv(
+    "SIGNING_KEY_FINGERPRINT",
+    "9add655a78e96c4ec7a53ef89dccb557cb5d767489fac5e785d671a5a75d4da2",
+)
+INDEX_WEBSITE = os.getenv("INDEX_WEBSITE", "https://keiyoushi.github.io")
+INDEX_DISCORD = os.getenv("INDEX_DISCORD", "https://discord.gg/3FbCpdKbdY")
 ASSET_LIMIT = 495  # Actual limit is 1000 but we upload 2 items per extension.
 UPLOAD_CHUNK_SIZE = 80
 UPLOAD_CHUNK_INTERVAL = 30
@@ -180,15 +192,31 @@ final_extensions.extend(
     if not any(ext.packageName.endswith(f".{module}") for module in to_delete)
 )
 final_extensions.extend(ext for ext, _, _, _, _ in new_extensions)
+
+# Overlay mode: anything no longer listed in the overlay file drops out of the index, so
+# removing a line there is enough to retire an extension from this repo.
+overlay_suffixes = overlay_package_suffixes(SOURCE_DIR)
+if overlay_suffixes is not None:
+    final_extensions = [
+        ext
+        for ext in final_extensions
+        if any(ext.packageName.endswith(f".{suffix}") for suffix in overlay_suffixes)
+    ]
+    updated_release_assets = {
+        package_name: assets
+        for package_name, assets in updated_release_assets.items()
+        if any(package_name.endswith(f".{suffix}") for suffix in overlay_suffixes)
+    }
+
 final_extensions.sort(key=lambda ext: ext.packageName)
 
 index = index_pb2.Index(
-    name="Keiyoushi",
-    badgeLabel="KEI",
-    signingKey="9add655a78e96c4ec7a53ef89dccb557cb5d767489fac5e785d671a5a75d4da2",
+    name=INDEX_NAME,
+    badgeLabel=INDEX_BADGE,
+    signingKey=INDEX_SIGNING_KEY,
     contact=index_pb2.Contact(
-        website="https://keiyoushi.github.io",
-        discord="https://discord.gg/3FbCpdKbdY",
+        website=INDEX_WEBSITE,
+        discord=INDEX_DISCORD,
     ),
     extensionList=index_pb2.ExtensionList(extensions=final_extensions),
 )
@@ -249,7 +277,7 @@ def create_release(tag: str):
         "--title",
         f"Repository Update {tag}",
         "--notes",
-        f"Automated update from keiyoushi/extensions-source@{current_sha}",
+        f"Automated update from {SOURCE_REPO}@{current_sha}",
     )
 
 

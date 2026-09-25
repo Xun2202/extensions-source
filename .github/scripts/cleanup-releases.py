@@ -2,9 +2,8 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 
-from github_utils import REPO_NAME, run_gh
+from github_utils import REPO_NAME, SOURCE_REPO, run_gh
 
-SOURCE_REPO = "keiyoushi/extensions-source"
 PUBLISH_WORKFLOW = "build_push.yml"
 PUBLISH_JOB = "Publish extension repo"
 MIN_PUBLISH_AGE = timedelta(hours=1)

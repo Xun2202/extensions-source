@@ -1,0 +1,17 @@
+# Modules built and published by this overlay repo, one per line as <lang>/<extension>
+# (the directory under src/). Everything else in the tree is kept only so the fork can
+# stay in sync with keiyoushi/extensions-source; it is neither built nor published here.
+#
+# Lines starting with '#' and blank lines are ignored.
+
+# Fixes not (yet) in upstream
+all/asmhentai
+
+# Sources removed from Keiyoushi after the 2026 DMCA notices (carried over from
+# yuzono/cursed-manga-extensions)
+all/ehentai
+all/hitomi
+all/nhentai
+all/pururin
+en/hentai20
+en/hentai2read

@@ -47,6 +47,12 @@ abstract class AsmHentai : GalleryAdults() {
     override val galleryIdSelector = "load_id"
     override val thumbnailSelector = ".preview_thumb"
 
+    /**
+     * The site puts the total page count in `#t_pages` (only present when pages > 10),
+     * not in the GalleryAdults default `#load_pages`.
+     */
+    override val totalPagesSelector = "t_pages"
+
     override val idPrefixUri = "g"
     override val pageUri = "gallery"
 

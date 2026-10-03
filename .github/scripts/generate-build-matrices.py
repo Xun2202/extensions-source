@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from github_utils import load_overlay_modules, overlay_package_suffixes
+from github_utils import OVERLAY_MODULES_FILE, load_overlay_modules, overlay_package_suffixes
 
 EXTENSION_REGEX = re.compile(r"^src/(?P<lang>\w+)/(?P<extension>\w+)")
 MULTISRC_LIB_REGEX = re.compile(r"^lib-multisrc/(?P<multisrc>\w+)")
@@ -166,7 +166,9 @@ def get_module_list(ref: str) -> tuple[list[str], list[str], list[str]]:
     core_files_changed = False
 
     for file in map(lambda x: Path(x).as_posix(), changed_files):
-        if CORE_FILES_REGEX.search(file):
+        # Editing the overlay whitelist must rebuild/republish everything it lists so that
+        # retired modules drop out of the published index.
+        if CORE_FILES_REGEX.search(file) or file == OVERLAY_MODULES_FILE:
             core_files_changed = True
 
         elif match := EXTENSION_REGEX.search(file):

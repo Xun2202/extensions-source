@@ -18,7 +18,7 @@ everything else on Keiyoushi.
 
 | Module | Why it is here |
 | --- | --- |
-| `all/asmhentai` | Restores `totalPagesSelector = "t_pages"` (upstream regression from #19161 that limits galleries to 10 pages). Drop once upstream fixes it. |
+| ~~`all/asmhentai`~~ | Retired 2026-10-03: upstream shipped the same `totalPagesSelector = "t_pages"` fix in keiyoushi#19543 (1.6.13). Uninstall the overlay-signed AsmHentai and reinstall it from Keiyoushi. |
 | `all/ehentai`, `all/hitomi`, `all/nhentai`, `all/pururin`, `en/hentai20`, `en/hentai2read` | Removed from Keiyoushi after the 2026 DMCA notices; sources carried over from [yuzono/cursed-manga-extensions](https://github.com/yuzono/cursed-manga-extensions). |
 
 ## Local changes vs upstream
@@ -33,7 +33,6 @@ Everything overlay-specific is confined to:
 - `.github/scripts/cleanup-releases.py` - uses `SOURCE_REPO` from `github_utils`.
 - `.github/workflows/build_push.yml`, `.github/workflows/cleanup_releases.yml` - repo targets and
   env vars; the `github.repository == 'keiyoushi/...'` gates are removed.
-- `src/all/asmhentai` - the fix above (versionCode bumped).
 - The six carried-over source directories.
 
 ## Routine maintenance
@@ -50,7 +49,13 @@ git push
 ```
 
 CI rebuilds whichever whitelisted modules were touched. To add or retire a module, edit
-`.github/overlay-modules.txt`; retired modules disappear from the published index on the next run.
+`.github/overlay-modules.txt`; any change to that file rebuilds all listed modules and republishes the
+index, so retired modules disappear from it on the same run.
+
+A scheduled workflow (`.github/workflows/sync_upstream.yml`) merges upstream every 3 days and triggers
+CI. It keeps this fork's `.github/workflows/**` untouched and fails loudly on any other conflict. Note
+that a clean textual merge can still produce a semantic conflict (e.g. upstream adding the same
+override we carry, as happened with AsmHentai) - a red CI run after a sync is the signal to look.
 
 ## Required repository secrets
 
